@@ -69,7 +69,7 @@ See [cors.md](docs/cors.md) for more details.
 
 ## Installation
 ```bash
-npm install --save mpegts.js
+npm install --save ruihua-mpegts.js
 ```
 
 ## Build
