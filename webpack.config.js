@@ -21,7 +21,11 @@ module.exports = (env, argv) => {
         devtool: isDevelopment ? 'eval-source-map' : 'source-map',
 
         resolve: {
-            extensions: ['.ts', '.tsx', '.js', '.json']
+            extensions: ['.ts', '.tsx', '.js', '.json'],
+            fallback: {
+                fs: false,
+                path: false
+            }
         },
 
         plugins: [
@@ -30,16 +34,9 @@ module.exports = (env, argv) => {
             })
         ],
 
-        node: {
-            'fs': 'empty',
-            'path': 'empty'
-        },
-
         optimization: {
             minimizer: [
-                new TerserPlugin({
-                    sourceMap: true
-                })
+                new TerserPlugin()
             ]
         },
 

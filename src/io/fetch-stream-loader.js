@@ -216,7 +216,10 @@ class FetchStreamLoader extends BaseLoader {
 
                 this._status = LoaderStatus.kBuffering;
 
-                let chunk = result.value.buffer;
+                let view = result.value;
+                let chunk = (view.byteOffset === 0 && view.byteLength === view.buffer.byteLength)
+                    ? view.buffer
+                    : view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
                 let byteStart = this._range.from + this._receivedLength;
                 this._receivedLength += chunk.byteLength;
 

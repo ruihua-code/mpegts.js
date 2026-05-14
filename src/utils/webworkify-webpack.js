@@ -85,6 +85,14 @@ function isNumeric(n) {
   return !isNaN(1 * n); // 1 * n converts integers, integers as string ("123"), 1e3 and "1e3" to integers and strings to NaN
 }
 
+function stringifyModule (module) {
+  var source = module.toString()
+  if (/^function\s?\w*\(/.test(source) || /^\(?\s*[\w$,\s]*\)?\s*=>/.test(source)) {
+    return source
+  }
+  return source.replace(/^[^{]*\(([^)]*)\)\s*\{/, 'function($1) {')
+}
+
 function getModuleDependencies (sources, module, queueName) {
   var retval = {}
   retval[queueName] = []
@@ -173,7 +181,7 @@ module.exports = function (moduleId, options) {
     main: __webpack_modules__
   }
 
-  var requiredModules = options.all ? { main: Object.keys(sources.main) } : getRequiredModules(sources, moduleId)
+  var requiredModules = options.all === false ? getRequiredModules(sources, moduleId) : { main: Object.keys(sources.main) }
 
   var src = ''
 
@@ -184,10 +192,10 @@ module.exports = function (moduleId, options) {
     }
     requiredModules[module].push(entryModule)
     sources[module][entryModule] = '(function(module, exports, __webpack_require__) { module.exports = __webpack_require__; })'
-    src = src + 'var ' + module + ' = (' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(entryModule)) + ')({' + requiredModules[module].map(function (id) { return '' + JSON.stringify(id) + ': ' + sources[module][id].toString() }).join(',') + '});\n'
+    src = src + 'var ' + module + ' = (' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(entryModule)) + ')({' + requiredModules[module].map(function (id) { return '' + JSON.stringify(id) + ': ' + stringifyModule(sources[module][id]) }).join(',') + '});\n'
   })
 
-  src = src + 'new ((' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(moduleId)) + ')({' + requiredModules.main.map(function (id) { return '' + JSON.stringify(id) + ': ' + sources.main[id].toString() }).join(',') + '}))(self);'
+  src = src + 'new ((' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(moduleId)) + ')({' + requiredModules.main.map(function (id) { return '' + JSON.stringify(id) + ': ' + stringifyModule(sources.main[id]) }).join(',') + '}))(self);'
 
   var blob = new self.Blob([src], { type: 'text/javascript' })
   if (options.bare) { return blob }
