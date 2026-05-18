@@ -256,21 +256,21 @@ class TransmuxingController {
             }
 
             if (!probeData.match && !probeData.needMoreData) {
-                // Non-FLV, try MPEG-TS probe
-                probeData = TSDemuxer.probe(data);
+                // Non-FLV, try MP4 probe first
+                probeData = MP4Demuxer.probe(data);
                 if (probeData.match) {
-                    // Hit as MPEG-TS
-                    this._setupTSDemuxerRemuxer(probeData);
+                    // Hit as MP4
+                    this._setupMP4DemuxerRemuxer(probeData);
                     consumed = this._demuxer.parseChunks(data, byteStart);
                 }
             }
 
             if (!probeData.match && !probeData.needMoreData) {
-                // Non-FLV / Non-MPEG-TS, try MP4 probe
-                probeData = MP4Demuxer.probe(data);
+                // Non-FLV / Non-MP4, try MPEG-TS probe
+                probeData = TSDemuxer.probe(data);
                 if (probeData.match) {
-                    // Hit as MP4
-                    this._setupMP4DemuxerRemuxer(probeData);
+                    // Hit as MPEG-TS
+                    this._setupTSDemuxerRemuxer(probeData);
                     consumed = this._demuxer.parseChunks(data, byteStart);
                 }
             }

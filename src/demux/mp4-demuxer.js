@@ -172,7 +172,7 @@ class MP4Demuxer {
         this._videoTrack.id = videoTrack.id;
 
         this._mp4box.setExtractionOptions(videoTrack.id, null, {
-            nbSamples: 100,
+            nbSamples: 10,
             rapAlignement: false
         });
         this._mp4box.start();

@@ -98,6 +98,17 @@ type AudioData = {
 
 class TSDemuxer extends BaseDemuxer {
 
+    private static isLikelyTSPacketHeader(data: Uint8Array, offset: number): boolean {
+        if (offset + 4 > data.byteLength || data[offset] !== 0x47) {
+            return false;
+        }
+
+        let transport_error_indicator = (data[offset + 1] & 0x80) >>> 7;
+        let adaptation_field_control = (data[offset + 3] & 0x30) >>> 4;
+
+        return transport_error_indicator === 0 && adaptation_field_control !== 0;
+    }
+
     private readonly TAG: string = 'TSDemuxer';
 
     private config_: any;
@@ -196,9 +207,9 @@ class TSDemuxer extends BaseDemuxer {
 
             for (let i = 0; i < scan_window; ) {
                 // sync_byte should all be 0x47
-                if (data[i] === 0x47
-                        && data[i + ts_packet_size] === 0x47
-                        && data[i + 2 * ts_packet_size] === 0x47) {
+                if (TSDemuxer.isLikelyTSPacketHeader(data, i)
+                        && TSDemuxer.isLikelyTSPacketHeader(data, i + ts_packet_size)
+                        && TSDemuxer.isLikelyTSPacketHeader(data, i + 2 * ts_packet_size)) {
                     sync_offset = i;
                     break;
                 } else {
