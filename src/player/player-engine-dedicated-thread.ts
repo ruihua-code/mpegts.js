@@ -313,7 +313,7 @@ class PlayerEngineDedicatedThread implements PlayerEngine {
 
     private _onMSEBufferFull(): void {
         Log.v(this.TAG, 'MSE SourceBuffer is full, suspend transmuxing task');
-        this._loading_controller.suspendTransmuxer();
+        this._loading_controller.suspendTransmuxer(true);
     }
 
     private _onMediaLoadedMetadata(e: any): void {

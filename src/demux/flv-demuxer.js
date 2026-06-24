@@ -26,6 +26,8 @@ import H265Parser from './h265-parser.js';
 import buffersAreEqual from '../utils/typedarray-equality.ts';
 import AV1OBUParser from './av1-parser.ts';
 import ExpGolomb from './exp-golomb.js';
+import { parseSEI } from './sei';
+import G711 from './g711.js';
 
 function Swap16(src) {
     return (((src >>> 8) & 0xFF) |
@@ -60,6 +62,7 @@ class FLVDemuxer {
         this._onScriptDataArrived = null;
         this._onTrackMetadata = null;
         this._onDataAvailable = null;
+        this._onSeiArrived = null;
 
         this._dataOffset = probeData.dataOffset;
         this._firstParse = true;
@@ -132,6 +135,7 @@ class FLVDemuxer {
         this._onScriptDataArrived = null;
         this._onTrackMetadata = null;
         this._onDataAvailable = null;
+        this._onSeiArrived = null;
     }
 
     static probe(buffer) {
@@ -201,6 +205,14 @@ class FLVDemuxer {
 
     set onScriptDataArrived(callback) {
         this._onScriptDataArrived = callback;
+    }
+
+    get onSeiArrived() {
+        return this._onSeiArrived
+    }
+
+    set onSeiArrived(callback) {
+        this._onSeiArrived = callback;
     }
 
     // prototype: function(type: number, info: string): void
@@ -458,6 +470,14 @@ class FLVDemuxer {
         }
     }
 
+    _parseSEIPayload(data, pts, codec) {
+        let sei_data = parseSEI(data, pts, codec);
+
+        if (sei_data && typeof this._onSeiArrived === 'function') {
+            this._onSeiArrived(sei_data);
+        }
+    }
+
     _parseKeyframesIndex(keyframes) {
         let times = [];
         let filepositions = [];
@@ -516,7 +536,7 @@ class FLVDemuxer {
         }
         // Legacy FLV
 
-        if (soundFormat !== 2 && soundFormat !== 3 && soundFormat !== 10) {  // PCM or MP3 or AAC
+        if (soundFormat !== 2 && soundFormat !== 3 && soundFormat !== 7 && soundFormat !== 8 && soundFormat !== 10) {  // PCM or MP3 or PCMA or PCMU or AAC
             this._onError(DemuxErrors.CODEC_UNSUPPORTED, 'Flv: Unsupported audio codec idx: ' + soundFormat);
             return;
         }
@@ -684,6 +704,80 @@ class FLVDemuxer {
             }
 
             let data = new Uint8Array(arrayBuffer, dataOffset + 1, dataSize - 1);
+            let dts = this._timestampBase + tagTimestamp;
+            let pcmSample = {unit: data, length: data.byteLength, dts: dts, pts: dts};
+            track.samples.push(pcmSample);
+            track.length += data.length;
+        } else if (soundFormat === 7) {  // G.711 A-law (PCMA) - decode to PCM
+            if (!meta.codec) {
+                meta.audioSampleRate = soundRate;
+                meta.sampleSize = 16;  // 16-bit PCM output
+                meta.littleEndian = false;  // Big-endian for decoded PCM
+                meta.codec = 'ipcm';
+                meta.originalCodec = 'pcma';
+
+                this._audioInitialMetadataDispatched = true;
+                this._onTrackMetadata('audio', meta);
+
+                let mi = this._mediaInfo;
+                mi.audioCodec = meta.codec;
+                mi.audioSampleRate = meta.audioSampleRate;
+                mi.audioChannelCount = meta.channelCount;
+                mi.audioDataRate = meta.sampleSize * meta.audioSampleRate;
+                if (mi.hasVideo) {
+                    if (mi.videoCodec != null) {
+                        mi.mimeType = 'video/x-flv; codecs="' + mi.videoCodec + ',' + mi.audioCodec + '"';
+                    }
+                } else {
+                    mi.mimeType = 'video/x-flv; codecs="' + mi.audioCodec + '"';
+                }
+                if (mi.isComplete()) {
+                    this._onMediaInfo(mi);
+                }
+            }
+
+            // Decode G.711 A-law to 16-bit PCM
+            let alawData = new Uint8Array(arrayBuffer, dataOffset + 1, dataSize - 1);
+            let pcmData = G711.decodeAlaw(alawData);
+            let data = new Uint8Array(pcmData.buffer);
+            
+            let dts = this._timestampBase + tagTimestamp;
+            let pcmSample = {unit: data, length: data.byteLength, dts: dts, pts: dts};
+            track.samples.push(pcmSample);
+            track.length += data.length;
+        } else if (soundFormat === 8) {  // G.711 μ-law (PCMU) - decode to PCM
+            if (!meta.codec) {
+                meta.audioSampleRate = soundRate;
+                meta.sampleSize = 16;  // 16-bit PCM output
+                meta.littleEndian = false;  // Big-endian for decoded PCM
+                meta.codec = 'ipcm';
+                meta.originalCodec = 'pcmu';
+
+                this._audioInitialMetadataDispatched = true;
+                this._onTrackMetadata('audio', meta);
+
+                let mi = this._mediaInfo;
+                mi.audioCodec = meta.codec;
+                mi.audioSampleRate = meta.audioSampleRate;
+                mi.audioChannelCount = meta.channelCount;
+                mi.audioDataRate = meta.sampleSize * meta.audioSampleRate;
+                if (mi.hasVideo) {
+                    if (mi.videoCodec != null) {
+                        mi.mimeType = 'video/x-flv; codecs="' + mi.videoCodec + ',' + mi.audioCodec + '"';
+                    }
+                } else {
+                    mi.mimeType = 'video/x-flv; codecs="' + mi.audioCodec + '"';
+                }
+                if (mi.isComplete()) {
+                    this._onMediaInfo(mi);
+                }
+            }
+
+            // Decode G.711 μ-law to 16-bit PCM
+            let mulawData = new Uint8Array(arrayBuffer, dataOffset + 1, dataSize - 1);
+            let pcmData = G711.decodeMulaw(mulawData);
+            let data = new Uint8Array(pcmData.buffer);
+            
             let dts = this._timestampBase + tagTimestamp;
             let pcmSample = {unit: data, length: data.byteLength, dts: dts, pts: dts};
             track.samples.push(pcmSample);
@@ -1673,6 +1767,10 @@ class FLVDemuxer {
             units.push(unit);
             length += data.byteLength;
 
+            if (unitType === 6) {  // SEI
+                this._parseSEIPayload(data.subarray(lengthSize), dts + cts, 'h264');
+            }
+
             offset += lengthSize + naluSize;
         }
 
@@ -1730,6 +1828,10 @@ class FLVDemuxer {
             let unit = {type: unitType, data: data};
             units.push(unit);
             length += data.byteLength;
+
+            if (unitType === 39 || unitType === 40) {  // Prefix / Suffix SEI
+                this._parseSEIPayload(data.subarray(lengthSize), dts + cts, 'h265');
+            }
 
             offset += lengthSize + naluSize;
         }

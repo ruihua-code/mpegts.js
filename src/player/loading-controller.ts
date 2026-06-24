@@ -28,6 +28,7 @@ class LoadingController {
     private _on_resume_transmuxer: () => void = null;
 
     private _paused: boolean = false;
+    private _media_time_update_listener_added: boolean = false;
 
     private e?: any = null;
 
@@ -48,7 +49,7 @@ class LoadingController {
     }
 
     public destroy(): void {
-        this._media_element.removeEventListener('timeupdate', this.e.onMediaTimeUpdate);
+        this._removeMediaTimeUpdateListener();
         this.e = null;
         this._media_element = null;
         this._config = null;
@@ -97,14 +98,30 @@ class LoadingController {
         const current_time = this._media_element.currentTime;
         if (buffered_end >= current_time + this._config.lazyLoadMaxDuration && !this._paused) {
             Log.v(this.TAG, 'Maximum buffering duration exceeded, suspend transmuxing task');
-            this.suspendTransmuxer();
-            this._media_element.addEventListener('timeupdate', this.e.onMediaTimeUpdate);
+            this.suspendTransmuxer(true);
         }
     }
 
-    public suspendTransmuxer(): void {
+    public suspendTransmuxer(resume_on_time_update: boolean = false): void {
         this._paused = true;
         this._on_pause_transmuxer();
+        if (resume_on_time_update) {
+            this._addMediaTimeUpdateListener();
+        }
+    }
+
+    private _addMediaTimeUpdateListener(): void {
+        if (!this._media_time_update_listener_added) {
+            this._media_element.addEventListener('timeupdate', this.e.onMediaTimeUpdate);
+            this._media_time_update_listener_added = true;
+        }
+    }
+
+    private _removeMediaTimeUpdateListener(): void {
+        if (this._media_time_update_listener_added) {
+            this._media_element.removeEventListener('timeupdate', this.e.onMediaTimeUpdate);
+            this._media_time_update_listener_added = false;
+        }
     }
 
     private _resumeTransmuxerIfNeeded(): void {
@@ -128,12 +145,12 @@ class LoadingController {
         if (should_resume) {
             Log.v(this.TAG,  'Continue loading from paused position');
             this.resumeTransmuxer();
-            this._media_element.removeEventListener('timeupdate', this.e.onMediaTimeUpdate);
         }
     }
 
     public resumeTransmuxer(): void {
         this._paused = false;
+        this._removeMediaTimeUpdateListener();
         this._on_resume_transmuxer();
     }
 

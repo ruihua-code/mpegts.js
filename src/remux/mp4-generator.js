@@ -24,7 +24,7 @@ class MP4 {
         MP4.types = {
             avc1: [], avcC: [], btrt: [], dinf: [],
             dref: [], esds: [], ftyp: [], hdlr: [],
-            hvc1: [], hvcC: [], av01: [], av1C: [],
+            hvc1: [], hev1: [], hvcC: [], av01: [], av1C: [],
             mdat: [], mdhd: [], mdia: [], mfhd: [],
             minf: [], moof: [], moov: [], mp4a: [],
             mvex: [], mvhd: [], sdtp: [], stbl: [],
@@ -338,7 +338,7 @@ class MP4 {
             }
             // else: aac -> mp4a
             return MP4.box(MP4.types.stsd, MP4.constants.STSD_PREFIX, MP4.mp4a(meta));
-        } else if (meta.type === 'video' && meta.codec.startsWith('hvc1')) {
+        } else if (meta.type === 'video' && (meta.codec.startsWith('hvc1') || meta.codec.startsWith('hev1'))) {
             return MP4.box(MP4.types.stsd, MP4.constants.STSD_PREFIX, MP4.hvc1(meta));
         } else if (meta.type === 'video' && meta.codec.startsWith('av01')) {
             return MP4.box(MP4.types.stsd, MP4.constants.STSD_PREFIX, MP4.av01(meta));
@@ -664,6 +664,7 @@ class MP4 {
     static hvc1(meta) {
         let hvcc = meta.hvcc;
         let width = meta.codecWidth, height = meta.codecHeight;
+        let type = meta.codec.startsWith('hev1') ? MP4.types.hev1 : MP4.types.hvc1;
 
         let data = new Uint8Array([
             0x00, 0x00, 0x00, 0x00,  // reserved(4)
@@ -692,7 +693,7 @@ class MP4 {
             0x00, 0x18,              // depth
             0xFF, 0xFF               // pre_defined = -1
         ]);
-        return MP4.box(MP4.types.hvc1, data, MP4.box(MP4.types.hvcC, hvcc));
+        return MP4.box(type, data, MP4.box(MP4.types.hvcC, hvcc));
     }
 
     static av01(meta) {

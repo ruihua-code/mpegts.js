@@ -98,13 +98,17 @@
                 }
             }
             player = mpegts.createPlayer(mediaDataSource, {
-                enableWorker: true,
+                enableWorker: false,
                 lazyLoadMaxDuration: 3 * 60,
                 seekType: 'range',
                 liveBufferLatencyChasing: document.getElementById('liveBufferLatencyChasing').checked,
             });
             player.attachMediaElement(element);
             player.load();
+
+            player.on(mpegts.Events.SEI_ARRIVED, function(data) {
+                console.log('sei', data);
+            })
         }
 
         function player_start() {

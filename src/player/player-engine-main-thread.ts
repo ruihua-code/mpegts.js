@@ -243,6 +243,9 @@ class PlayerEngineMainThread implements PlayerEngine {
         this._transmuxer.on(TransmuxingEvents.SMPTE2038_METADATA_ARRIVED, (smpte2038_metadata: any) => {
             this._emitter.emit(PlayerEvents.SMPTE2038_METADATA_ARRIVED, smpte2038_metadata);
         });
+        this._transmuxer.on(TransmuxingEvents.SEI_ARRIVED, (sei_data: any) => {
+            this._emitter.emit(PlayerEvents.SEI_ARRIVED, sei_data);
+        });
         this._transmuxer.on(TransmuxingEvents.SCTE35_METADATA_ARRIVED, (scte35_metadata: any) => {
             this._emitter.emit(PlayerEvents.SCTE35_METADATA_ARRIVED, scte35_metadata);
         });
@@ -362,7 +365,7 @@ class PlayerEngineMainThread implements PlayerEngine {
 
     private _onMSEBufferFull(): void {
         Log.v(this.TAG, 'MSE SourceBuffer is full, suspend transmuxing task');
-        this._loading_controller.suspendTransmuxer();
+        this._loading_controller.suspendTransmuxer(true);
     }
 
     private _onMSEError(info: any): void {
